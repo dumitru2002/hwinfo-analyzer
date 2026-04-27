@@ -55,19 +55,6 @@ Enterprise-grade browser-based viewer for **HWiNFO64** CSV sensor logs. Drop a l
 
 ---
 
-## Deploy to GitHub Pages
-
-```bash
-git clone https://github.com/<your-username>/hwinfo-analyzer.git
-cd hwinfo-analyzer
-git add .
-git commit -m "initial commit"
-git push origin main
-# Go to repo → Settings → Pages → Source: main / root
-```
-
----
-
 ## Project structure
 
 ```
