@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Enterprise HWiNFO64 CSV analyzer — health scoring, event detection, correlations, and cross-chart diagnostics." />
+  <title>PC Health Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231e2128'/><path d='M6 22L6 10L11 16L16 8L21 18L24 14L26 14' stroke='%234f8ef7' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='26' cy='14' r='2' fill='%234fd48a'/></svg>" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     UPLOAD SCREEN
+═══════════════════════════════════════════════════════════════════ -->
+<div id="screen-upload">
+  <header class="upload-header">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect width="32" height="32" rx="6" fill="#1e2128"/>
+        <path d="M6 22L6 10L11 16L16 8L21 18L24 14L26 14" stroke="#4f8ef7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="26" cy="14" r="2" fill="#4fd48a"/>
+      </svg>
+      <span class="brand-name">PC Health Analyzer</span>
+    </div>
+    <div class="upload-header-links">
+      <a href="https://www.hwinfo.com/download/" target="_blank" rel="noopener">Get HWiNFO64 ↗</a>
+      <a href="https://github.com/" target="_blank" rel="noopener" id="github-link">GitHub ↗</a>
+      <button class="btn-icon" id="btn-theme-upload" title="Toggle theme" aria-label="Toggle theme">☽</button>
+    </div>
+  </header>
+
+  <main class="upload-main">
+    <div class="upload-hero">
+      <h1>PC Health Analyzer</h1>
+      <p class="upload-sub">Drop a HWiNFO64 CSV log to get an instant health score, event timeline, correlations, and actionable diagnostics.</p>
+    </div>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-inner" id="drop-inner">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true" class="drop-icon">
+          <rect x="10" y="4" width="28" height="36" rx="4" stroke="currentColor" stroke-width="1.5" opacity=".3"/>
+          <path d="M16 15h16M16 21h16M16 27h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".3"/>
+          <circle cx="36" cy="36" r="8" fill="var(--bg-card)" stroke="var(--accent)" stroke-width="1.5"/>
+          <path d="M36 31.5v9M32 36h8" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <h2 class="drop-title">Drop your HWiNFO CSV here</h2>
+        <p class="drop-hint">
+          All analysis runs <strong>locally in your browser</strong> — nothing is uploaded.
+          <br>Export from HWiNFO64 → Sensors → Log to CSV.
+        </p>
+        <label class="btn-primary" for="file-input">Browse file</label>
+        <input type="file" id="file-input" accept=".csv,.txt" />
+      </div>
+    </div>
+
+    <div class="upload-guide">
+      <div class="guide-step"><span class="guide-num">1</span><span>Open HWiNFO64 → Sensors only</span></div>
+      <span class="guide-arrow" aria-hidden="true">→</span>
+      <div class="guide-step"><span class="guide-num">2</span><span>Click 💾 to start CSV logging</span></div>
+      <span class="guide-arrow" aria-hidden="true">→</span>
+      <div class="guide-step"><span class="guide-num">3</span><span>Work your day, stop logging</span></div>
+      <span class="guide-arrow" aria-hidden="true">→</span>
+      <div class="guide-step"><span class="guide-num">4</span><span>Drop the .csv here</span></div>
+    </div>
+
+    <div class="upload-features">
+      <div class="feature-card"><span class="feature-icon">◎</span><strong>Health Score</strong><span>0–100 system score with severity breakdown</span></div>
+      <div class="feature-card"><span class="feature-icon">◉</span><strong>Event Detection</strong><span>Every threshold breach logged with timestamps & duration</span></div>
+      <div class="feature-card"><span class="feature-icon">◈</span><strong>Correlations</strong><span>Pearson analysis between CPU/GPU temp and load</span></div>
+      <div class="feature-card"><span class="feature-icon">◇</span><strong>Zoom & Sync</strong><span>Cross-chart crosshair, zoom & pan on all charts</span></div>
+      <div class="feature-card"><span class="feature-icon">◆</span><strong>Export</strong><span>Download charts as PNG or print a full report</span></div>
+      <div class="feature-card"><span class="feature-icon">◫</span><strong>Compare</strong><span>Load two sessions to compare side by side</span></div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     LOADING SCREEN
+═══════════════════════════════════════════════════════════════════ -->
+<div id="screen-loading" hidden>
+  <div class="loading-content">
+    <div class="loading-spinner" role="status" aria-label="Parsing file"></div>
+    <p id="loading-status">Parsing CSV…</p>
+    <p class="loading-sub">Running diagnostics</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     MAIN APP
+═══════════════════════════════════════════════════════════════════ -->
+<div id="screen-app" hidden>
+
+  <!-- ── App Header ─────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="app-header-left">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true" class="header-logo">
+        <rect width="32" height="32" rx="6" fill="#1e2128"/>
+        <path d="M6 22L6 10L11 16L16 8L21 18L24 14L26 14" stroke="#4f8ef7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="26" cy="14" r="2" fill="#4fd48a"/>
+      </svg>
+      <span class="header-brand-name">PC Health Analyzer</span>
+      <span class="header-sep" aria-hidden="true">·</span>
+      <span class="header-filename" id="hdr-filename">—</span>
+    </div>
+    <div class="app-header-right">
+      <div class="health-pill" id="hdr-health-pill">
+        <span id="hdr-health-score">—</span>
+        <span class="health-pill-label">/ 100</span>
+      </div>
+      <button class="btn-ghost" id="btn-compare" title="Load a second session to compare">⇄ Compare</button>
+      <button class="btn-ghost" id="btn-theme" title="Toggle light/dark theme" aria-label="Toggle theme">☽</button>
+      <button class="btn-ghost" id="btn-reset" title="Load a new file">✕ Close</button>
+    </div>
+  </header>
+
+  <!-- ── Tab Navigation ─────────────────────────────────────────── -->
+  <nav class="tab-nav" role="tablist">
+    <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true">Overview</button>
+    <button class="tab-btn" data-tab="charts" role="tab" aria-selected="false">Charts</button>
+    <button class="tab-btn" data-tab="events" role="tab" aria-selected="false">
+      Events
+      <span class="tab-badge" id="events-badge" hidden></span>
+    </button>
+    <button class="tab-btn" data-tab="export" role="tab" aria-selected="false">Export</button>
+  </nav>
+
+  <!-- ── Tab: Overview ──────────────────────────────────────────── -->
+  <section id="tab-overview" class="tab-pane" role="tabpanel">
+
+    <!-- Top row: verdict card + session info + timeline -->
+    <div class="overview-top">
+
+      <!-- Health Score Card -->
+      <div class="health-score-card card">
+        <p class="card-label">Health Score</p>
+        <div class="health-ring-wrap">
+          <svg class="health-ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring-bg" cx="60" cy="60" r="50"/>
+            <circle class="ring-track" cx="60" cy="60" r="50" id="health-ring-arc"/>
+          </svg>
+          <div class="health-ring-inner">
+            <span class="health-score-num" id="health-score-num">—</span>
+            <span class="health-score-denom">/ 100</span>
+            <span class="health-grade" id="health-grade">—</span>
+          </div>
+        </div>
+        <div class="health-breakdown" id="health-breakdown"></div>
+      </div>
+
+      <!-- Session Info + Timeline + Insights -->
+      <div class="session-info-wrap">
+
+        <!-- Session info with start/end time -->
+        <div class="session-meta card">
+          <div class="session-meta-row"><span>File</span><strong id="meta-filename">—</strong></div>
+          <div class="session-meta-row"><span>Date</span><strong id="meta-date">—</strong></div>
+          <div class="session-meta-row"><span>Start</span><strong id="meta-start">—</strong></div>
+          <div class="session-meta-row"><span>End</span><strong id="meta-end">—</strong></div>
+          <div class="session-meta-row"><span>Duration</span><strong id="meta-duration">—</strong></div>
+          <div class="session-meta-row"><span>Samples</span><strong id="meta-samples">—</strong></div>
+        </div>
+
+        <!-- Activity timeline -->
+        <div class="activity-card card">
+          <p class="card-label">Activity Timeline — <span class="card-label-sub">color shows worst sensor state per time window</span></p>
+          <div class="timeline-strip" id="timeline-strip"></div>
+          <div class="timeline-legend">
+            <span class="tl-ok">● Normal</span>
+            <span class="tl-warn">● Warning</span>
+            <span class="tl-crit">● Critical</span>
+          </div>
+        </div>
+
+        <!-- Insights (replaces raw correlations) -->
+        <div class="correlations-card card" id="insights-card">
+          <p class="card-label">Observations</p>
+          <div id="correlations-list"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- What to do about it -->
+    <h2 class="section-heading"><span class="sh-icon" aria-hidden="true">◆</span> What to do</h2>
+    <div id="recommendations-list"></div>
+
+    <!-- What went wrong -->
+    <h2 class="section-heading"><span class="sh-icon" aria-hidden="true">◉</span> What happened during this session</h2>
+    <div id="alerts-list"></div>
+
+    <!-- Peak readings -->
+    <h2 class="section-heading"><span class="sh-icon" aria-hidden="true">◈</span> Peak readings</h2>
+    <div class="stats-grid" id="stats-grid"></div>
+
+  </section>
+
+  <!-- ── Tab: Charts ────────────────────────────────────────────── -->
+  <section id="tab-charts" class="tab-pane" role="tabpanel" hidden>
+    <div class="charts-toolbar">
+      <div class="chart-groups" id="chart-groups" role="group" aria-label="Filter by sensor group">
+        <button class="cg-btn active" data-group="all">All</button>
+        <button class="cg-btn" data-group="cpu">CPU</button>
+        <button class="cg-btn" data-group="gpu">GPU</button>
+        <button class="cg-btn" data-group="ram">RAM</button>
+        <button class="cg-btn" data-group="system">System</button>
+        <button class="cg-btn" data-group="fans">Fans</button>
+        <button class="cg-btn" data-group="power">Power</button>
+      </div>
+      <div class="charts-toolbar-right">
+        <label class="toggle-label" title="Sync vertical crosshair across all charts">
+          <input type="checkbox" id="toggle-crosshair" checked />
+          <span>Sync crosshair</span>
+        </label>
+        <button class="btn-ghost" id="btn-reset-zoom">↺ Reset zoom</button>
+      </div>
+    </div>
+    <div class="charts-grid" id="charts-grid"></div>
+  </section>
+
+  <!-- ── Tab: Events ────────────────────────────────────────────── -->
+  <section id="tab-events" class="tab-pane" role="tabpanel" hidden>
+    <div class="events-toolbar">
+      <div class="events-filters" role="group" aria-label="Filter events">
+        <button class="ef-btn active" data-filter="all">All events</button>
+        <button class="ef-btn" data-filter="critical">Critical</button>
+        <button class="ef-btn" data-filter="warning">Warnings</button>
+        <button class="ef-btn" data-filter="throttle">Throttling</button>
+      </div>
+      <div class="events-summary" id="events-summary"></div>
+    </div>
+    <div class="events-table-wrap">
+      <table class="events-table" id="events-table">
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Metric</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Duration</th>
+            <th>Peak value</th>
+            <th>Threshold</th>
+          </tr>
+        </thead>
+        <tbody id="events-tbody"></tbody>
+      </table>
+      <p class="events-empty" id="events-empty" hidden>No events match the current filter.</p>
+    </div>
+  </section>
+
+  <!-- ── Tab: Export ────────────────────────────────────────────── -->
+  <section id="tab-export" class="tab-pane" role="tabpanel" hidden>
+    <div class="export-grid">
+
+      <div class="export-card card">
+        <div class="export-card-icon">🖼</div>
+        <h3>Download Charts (PNG)</h3>
+        <p>Save every chart as a separate PNG image, packaged as a zip-friendly batch download.</p>
+        <button class="btn-primary" id="btn-export-png">Download all charts</button>
+      </div>
+
+      <div class="export-card card">
+        <div class="export-card-icon">🖨</div>
+        <h3>Print / Save as PDF</h3>
+        <p>Open the browser print dialog. Select "Save as PDF" to get a complete printable report.</p>
+        <button class="btn-primary" id="btn-print">Print report</button>
+      </div>
+
+      <div class="export-card card">
+        <div class="export-card-icon">📋</div>
+        <h3>Copy Summary</h3>
+        <p>Copy a plain-text summary of the health score, peak values, and detected events to clipboard.</p>
+        <button class="btn-primary" id="btn-copy-summary">Copy to clipboard</button>
+        <span class="export-confirm" id="copy-confirm" hidden>✓ Copied!</span>
+      </div>
+
+      <div class="export-card card">
+        <div class="export-card-icon">⇄</div>
+        <h3>Compare Sessions</h3>
+        <p>Load a second CSV to overlay two sessions on all charts — useful for before/after comparisons.</p>
+        <button class="btn-primary" id="btn-load-compare">Load comparison file</button>
+        <input type="file" id="compare-file-input" accept=".csv,.txt" hidden />
+        <span class="export-confirm" id="compare-status"></span>
+      </div>
+
+    </div>
+  </section>
+
+</div><!-- /screen-app -->
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/diagnostics.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
