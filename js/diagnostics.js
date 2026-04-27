@@ -298,10 +298,11 @@ const Diagnostics = (() => {
         if (!vals.length) return null;
         const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
         const max = Math.max(...vals);
-        let metSev = avg >= dangerAt ? 'crit' : avg >= warnAt ? 'warn' : 'ok';
-        if (metSev === 'crit')                  sev = 'crit';
-        else if (metSev === 'warn' && sev !== 'crit') sev = 'warn';
-        return { avg: Math.round(avg), max: Math.round(max), sev: metSev };
+        const avgSev = avg >= dangerAt ? 'crit' : avg >= warnAt ? 'warn' : 'ok';
+        const maxSev = max >= dangerAt ? 'crit' : max >= warnAt ? 'warn' : 'ok';
+        if (avgSev === 'crit')                    sev = 'crit';
+        else if (avgSev === 'warn' && sev !== 'crit') sev = 'warn';
+        return { avg: Math.round(avg), max: Math.round(max), sev: maxSev };
       };
 
       const cpuTemp = getMetric(cpuTempCol, THRESHOLDS.cpuTemp.warn, THRESHOLDS.cpuTemp.danger);
