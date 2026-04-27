@@ -223,7 +223,7 @@ const Diagnostics = (() => {
       }
     }
 
-    // CPU load (based on average, not peak — peak spikes are normal)
+    // CPU load — stat-based (sustained avg) + frequency-based (repeated danger spikes)
     if (groups.cpuLoad[0]) {
       const s = computeStats(rows, groups.cpuLoad[0]);
       if (s) {
@@ -231,10 +231,17 @@ const Diagnostics = (() => {
           deduct('CPU chronically maxed out', Math.min(15, Math.round((s.avg - THRESHOLDS.cpuLoad.danger) * 1.5)), 'critical');
         else if (s.avg >= THRESHOLDS.cpuLoad.warn)
           deduct('CPU under heavy sustained load', Math.min(8, Math.round(s.avg - THRESHOLDS.cpuLoad.warn)), 'warning');
+
+        const cpuCritEvents = events.filter(e => e.type === 'threshold' && e.metric === 'CPU Load' && e.severity === 'critical').length;
+        const cpuWarnEvents = events.filter(e => e.type === 'threshold' && e.metric === 'CPU Load' && e.severity === 'warning').length;
+        if (cpuCritEvents)
+          deduct('CPU repeatedly hit danger threshold', Math.min(20, cpuCritEvents * 4), 'critical');
+        else if (cpuWarnEvents > 2)
+          deduct('CPU frequently under high load', Math.min(10, (cpuWarnEvents - 2) * 2), 'warning');
       }
     }
 
-    // RAM
+    // RAM — stat-based (p95 level) + frequency-based (recurring pressure events)
     const ramCol = groups.ramLoad[0];
     if (ramCol) {
       const s = computeStats(rows, ramCol);
@@ -243,6 +250,10 @@ const Diagnostics = (() => {
           deduct('RAM critically full (p95)', Math.min(15, Math.round((s.p95 - THRESHOLDS.ramLoad.danger) * 1.5)), 'critical');
         else if (s.p95 >= THRESHOLDS.ramLoad.warn)
           deduct('RAM near capacity (p95)', Math.min(8, Math.round(s.p95 - THRESHOLDS.ramLoad.warn)), 'warning');
+
+        const ramEvents = events.filter(e => e.type === 'threshold' && e.metric === 'RAM Load').length;
+        if (ramEvents > 1)
+          deduct('RAM pressure recurring', Math.min(12, (ramEvents - 1) * 3), ramEvents >= 4 ? 'critical' : 'warning');
       }
     }
 
