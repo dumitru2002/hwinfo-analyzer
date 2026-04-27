@@ -2,7 +2,7 @@
 
 Browser-based viewer for **HWiNFO64** CSV sensor logs. Drop a log file and instantly get a health score, event timeline, correlations, zoom-able charts, and plain-English diagnostics — all locally in your browser.
 
-**Live:** `(Open Website)[https://dumitru2002.github.io/hwinfo-analyzer]`
+**Live:** `[Open Website](https://dumitru2002.github.io/hwinfo-analyzer)`
 
 ---
 
