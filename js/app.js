@@ -105,7 +105,9 @@ function init() {
   DOM.dropInner.addEventListener('click',     () => DOM.fileInput.click());
   DOM.fileInput.addEventListener('change',    e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
 
-  // Prevent re-trigger on label click bubbling
+  // Prevent the label's click from bubbling to dropInner (which would open a second dialog)
+  // and prevent the programmatic fileInput.click() from looping back to dropInner
+  document.querySelector('label[for="file-input"]').addEventListener('click', e => e.stopPropagation());
   DOM.fileInput.addEventListener('click', e => e.stopPropagation());
 
   // Tabs
