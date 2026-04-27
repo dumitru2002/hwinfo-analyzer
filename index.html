@@ -163,7 +163,7 @@
 
         <!-- Activity timeline -->
         <div class="activity-card card">
-          <p class="card-label">Activity Timeline — <span class="card-label-sub">color shows worst sensor state per time window</span></p>
+          <p class="card-label">Activity Timeline — <span class="card-label-sub">hover for sensor details · dots mark events · click to jump</span></p>
           <div class="timeline-strip" id="timeline-strip"></div>
           <div class="timeline-legend">
             <span class="tl-ok">● Normal</span>
@@ -228,6 +228,10 @@
         <button class="ef-btn" data-filter="throttle">Throttling</button>
       </div>
       <div class="events-summary" id="events-summary"></div>
+    </div>
+    <div class="tl-filter-banner" id="tl-filter-banner" hidden>
+      <span id="tl-filter-label"></span>
+      <button class="tl-filter-clear" id="tl-filter-clear">✕ Clear</button>
     </div>
     <div class="events-table-wrap">
       <table class="events-table" id="events-table">

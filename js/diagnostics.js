@@ -277,10 +277,11 @@ const Diagnostics = (() => {
    * @param {number} buckets - number of segments
    * @returns {Array<{ severity: string, time: string, idx: number }>}
    */
-  function buildTimeline(rows, groups, buckets = 120) {
+  function buildTimeline(rows, groups, events, buckets = 120) {
     const cpuTempCol = Parser.prioritiseCpuTempCols(groups.cpuTemp)[0];
     const cpuLoadCol = groups.cpuLoad[0];
     const gpuTempCol = groups.gpuTemp[0];
+    const gpuLoadCol = Parser.prioritiseGpuLoadCols(groups.gpuLoad)[0];
     const ramLoadCol = groups.ramLoad[0];
 
     const size = Math.max(1, Math.ceil(rows.length / buckets));
@@ -288,23 +289,46 @@ const Diagnostics = (() => {
 
     for (let i = 0; i < rows.length; i += size) {
       const slice = rows.slice(i, i + size);
+      const endIdx = i + slice.length - 1;
       let sev = 'ok';
 
-      const check = (col, warnAt, dangerAt) => {
-        if (!col) return;
+      const getMetric = (col, warnAt, dangerAt) => {
+        if (!col) return null;
         const vals = slice.map(r => Parser.parseVal(r[col])).filter(v => v !== null);
-        if (!vals.length) return;
+        if (!vals.length) return null;
         const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-        if (avg >= dangerAt)                   sev = 'crit';
-        else if (avg >= warnAt && sev !== 'crit') sev = 'warn';
+        const max = Math.max(...vals);
+        let metSev = avg >= dangerAt ? 'crit' : avg >= warnAt ? 'warn' : 'ok';
+        if (metSev === 'crit')                  sev = 'crit';
+        else if (metSev === 'warn' && sev !== 'crit') sev = 'warn';
+        return { avg: Math.round(avg), max: Math.round(max), sev: metSev };
       };
 
-      check(cpuTempCol, THRESHOLDS.cpuTemp.warn, THRESHOLDS.cpuTemp.danger);
-      check(cpuLoadCol, THRESHOLDS.cpuLoad.warn, THRESHOLDS.cpuLoad.danger);
-      check(gpuTempCol, THRESHOLDS.gpuTemp.warn, THRESHOLDS.gpuTemp.danger);
-      check(ramLoadCol, THRESHOLDS.ramLoad.warn, THRESHOLDS.ramLoad.danger);
+      const cpuTemp = getMetric(cpuTempCol, THRESHOLDS.cpuTemp.warn, THRESHOLDS.cpuTemp.danger);
+      const cpuLoad = getMetric(cpuLoadCol, THRESHOLDS.cpuLoad.warn, THRESHOLDS.cpuLoad.danger);
+      const gpuTemp = getMetric(gpuTempCol, THRESHOLDS.gpuTemp.warn, THRESHOLDS.gpuTemp.danger);
+      const gpuLoad = getMetric(gpuLoadCol, Infinity, Infinity);
+      const ramLoad = getMetric(ramLoadCol, THRESHOLDS.ramLoad.warn, THRESHOLDS.ramLoad.danger);
 
-      segments.push({ severity: sev, time: slice[0]?.['Time'] ?? '', idx: i });
+      const segEvents = (events || []).filter(e =>
+        e.startIdx <= endIdx && e.endIdx >= i
+      );
+
+      // Escalate severity based on events in this segment (catches brief spikes averaging below threshold)
+      if (sev !== 'crit' && segEvents.some(e => e.severity === 'critical' || e.type === 'throttle')) {
+        sev = 'crit';
+      } else if (sev === 'ok' && segEvents.some(e => e.severity === 'warning')) {
+        sev = 'warn';
+      }
+
+      segments.push({
+        severity: sev,
+        time:    slice[0]?.['Time'] ?? '',
+        endTime: slice[slice.length - 1]?.['Time'] ?? '',
+        idx: i, endIdx,
+        metrics: { cpuTemp, cpuLoad, gpuTemp, gpuLoad, ramLoad },
+        events: segEvents,
+      });
     }
 
     return segments;

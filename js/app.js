@@ -34,6 +34,7 @@ const State = {
   activeTab:     'overview',
   activeChartGroup: 'all',
   eventsFilter:  'all',
+  timelineSegFilter: null,
 };
 
 const MAX_CHART_PTS = 600;
@@ -81,9 +82,12 @@ const DOM = {
   toggleCrosshair:$('toggle-crosshair'),
   btnResetZoom:   $('btn-reset-zoom'),
   // events
-  eventsTbody:    $('events-tbody'),
-  eventsEmpty:    $('events-empty'),
-  eventsSummary:  $('events-summary'),
+  eventsTbody:      $('events-tbody'),
+  eventsEmpty:      $('events-empty'),
+  eventsSummary:    $('events-summary'),
+  tlFilterBanner:   $('tl-filter-banner'),
+  tlFilterLabel:    $('tl-filter-label'),
+  tlFilterClear:    $('tl-filter-clear'),
   // export
   btnExportPNG:   $('btn-export-png'),
   btnPrint:       $('btn-print'),
@@ -139,8 +143,15 @@ function init() {
       document.querySelectorAll('.ef-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       State.eventsFilter = btn.dataset.filter;
+      State.timelineSegFilter = null;
       renderEventsTable();
     });
+  });
+
+  // Timeline segment filter clear
+  DOM.tlFilterClear.addEventListener('click', () => {
+    State.timelineSegFilter = null;
+    renderEventsTable();
   });
 
   // Header controls
@@ -217,7 +228,7 @@ function processSession(filename, text) {
 
   const events   = Diagnostics.detectEvents(rows, groups, interval);
   const health   = Diagnostics.computeHealthScore(rows, groups, events);
-  const timeline = Diagnostics.buildTimeline(rows, groups);
+  const timeline = Diagnostics.buildTimeline(rows, groups, events);
   const recs     = Diagnostics.generateRecommendations(rows, groups, events, health);
   const corrs    = Diagnostics.computeCorrelations(rows, groups);
 
@@ -316,15 +327,94 @@ function renderSessionMeta() {
 
 function renderTimeline() {
   DOM.timelineStrip.innerHTML = '';
+
+  // Shared floating tooltip (one instance, reused for all segments)
+  let tooltip = document.getElementById('tl-tooltip');
+  if (!tooltip) {
+    tooltip = el('div', 'tl-tooltip');
+    tooltip.id = 'tl-tooltip';
+    document.body.appendChild(tooltip);
+  }
+
+  const SEV_ICON = { crit: '✕', warn: '⚠', ok: '' };
+  const SEV_CLASS = { crit: 'tl-tt-crit', warn: 'tl-tt-warn', ok: '' };
+
+  function buildTooltip(seg) {
+    const metricRows = [
+      seg.metrics.cpuTemp && { label: 'CPU Temp', val: seg.metrics.cpuTemp.avg, unit: '°C', sev: seg.metrics.cpuTemp.sev },
+      seg.metrics.cpuLoad && { label: 'CPU Load', val: seg.metrics.cpuLoad.max, unit: '%',  sev: seg.metrics.cpuLoad.sev },
+      seg.metrics.gpuTemp && { label: 'GPU Temp', val: seg.metrics.gpuTemp.avg, unit: '°C', sev: seg.metrics.gpuTemp.sev },
+      seg.metrics.gpuLoad && { label: 'GPU Load', val: seg.metrics.gpuLoad.avg, unit: '%',  sev: 'ok' },
+      seg.metrics.ramLoad && { label: 'RAM',      val: seg.metrics.ramLoad.avg, unit: '%',  sev: seg.metrics.ramLoad.sev },
+    ].filter(Boolean);
+
+    const rows = metricRows.map(m => {
+      const cls = SEV_CLASS[m.sev] || '';
+      const icon = SEV_ICON[m.sev] ? `<span class="tl-tt-icon ${cls}">${SEV_ICON[m.sev]}</span>` : '<span class="tl-tt-icon"></span>';
+      return `<div class="tl-tt-row">
+        <span class="tl-tt-label">${esc(m.label)}</span>
+        <span class="tl-tt-val ${cls}">${m.val}${esc(m.unit)}</span>
+        ${icon}
+      </div>`;
+    }).join('');
+
+    const evLine = seg.events.length
+      ? `<div class="tl-tt-events">${seg.events.length} event${seg.events.length > 1 ? 's' : ''} · click to view</div>`
+      : '';
+
+    tooltip.innerHTML = `
+      <div class="tl-tt-time">${esc(seg.time)}${seg.endTime && seg.endTime !== seg.time ? ' – ' + esc(seg.endTime) : ''}</div>
+      <div class="tl-tt-divider"></div>
+      ${rows}
+      ${evLine}`;
+  }
+
+  function positionTooltip(e) {
+    const margin = 12;
+    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    let x = e.clientX + margin, y = e.clientY - th / 2;
+    if (x + tw > window.innerWidth  - margin) x = e.clientX - tw - margin;
+    if (y < margin) y = margin;
+    if (y + th > window.innerHeight - margin) y = window.innerHeight - th - margin;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+
+  // Colored bar
+  const inner = el('div', 'tl-inner');
+  const cursor = el('div', 'tl-cursor');
+  inner.appendChild(cursor);
+
   State.timeline.forEach(seg => {
     const s = el('div', `tl-seg ${seg.severity}`);
-    s.title = `${seg.time} — ${seg.severity}`;
-    s.addEventListener('click', () => {
-      // Jump to events tab if critical
-      if (seg.severity === 'crit') switchTab('events');
+
+    s.addEventListener('mouseenter', e => {
+      buildTooltip(seg);
+      tooltip.style.display = 'block';
+      positionTooltip(e);
+      cursor.style.display = 'block';
     });
-    DOM.timelineStrip.appendChild(s);
+    s.addEventListener('mousemove', e => {
+      positionTooltip(e);
+      const bar = inner.getBoundingClientRect();
+      const sx  = s.getBoundingClientRect();
+      cursor.style.left = (sx.left - bar.left + sx.width / 2) + 'px';
+    });
+    s.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+      cursor.style.display  = 'none';
+    });
+    s.addEventListener('click', () => {
+      if (!seg.events.length && seg.severity === 'ok') return;
+      State.timelineSegFilter = { events: seg.events, time: seg.time, endTime: seg.endTime };
+      switchTab('events');
+      renderEventsTable();
+    });
+
+    inner.appendChild(s);
   });
+
+  DOM.timelineStrip.appendChild(inner);
 }
 
 function renderCorrelations() {
@@ -551,11 +641,23 @@ function filterChartCards() {
 
 // ── Events Table ─────────────────────────────────────────────────
 function renderEventsTable() {
-  const { events, eventsFilter } = State;
+  const { events, eventsFilter, timelineSegFilter } = State;
   let filtered = events;
-  if (eventsFilter === 'critical')  filtered = events.filter(e => e.severity === 'critical' && e.type !== 'throttle');
-  if (eventsFilter === 'warning')   filtered = events.filter(e => e.severity === 'warning');
-  if (eventsFilter === 'throttle')  filtered = events.filter(e => e.type === 'throttle');
+
+  if (timelineSegFilter) {
+    // Segment click: show only the events that overlap that window
+    filtered = timelineSegFilter.events;
+    DOM.tlFilterBanner.hidden = false;
+    const t = timelineSegFilter.time === timelineSegFilter.endTime
+      ? timelineSegFilter.time
+      : `${timelineSegFilter.time} – ${timelineSegFilter.endTime}`;
+    DOM.tlFilterLabel.textContent = `Showing ${filtered.length} event${filtered.length !== 1 ? 's' : ''} from ${t}`;
+  } else {
+    DOM.tlFilterBanner.hidden = true;
+    if (eventsFilter === 'critical') filtered = events.filter(e => e.severity === 'critical' && e.type !== 'throttle');
+    if (eventsFilter === 'warning')  filtered = events.filter(e => e.severity === 'warning');
+    if (eventsFilter === 'throttle') filtered = events.filter(e => e.type === 'throttle');
+  }
 
   DOM.eventsTbody.innerHTML = '';
   DOM.eventsEmpty.hidden = !!filtered.length;
@@ -656,7 +758,7 @@ function resetApp() {
     timeline: null, recs: null, corrs: null, chartCfgs: null,
     sampledRows: null, labels: null, filename: '',
     compareRows: null, compareLabels: null, compareActive: false,
-    activeTab: 'overview', eventsFilter: 'all',
+    activeTab: 'overview', eventsFilter: 'all', timelineSegFilter: null,
   });
   DOM.fileInput.value = '';
   DOM.compareFileInput.value = '';
